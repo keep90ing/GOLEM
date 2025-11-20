@@ -1,0 +1,8 @@
+# Annouce it's non-interactive to avoid being asking stupid questions
+apt update
+DEBIAN_FRONTEND="noninteractive" apt-get -y install tzdata
+
+# Note that this package manager is for Debian-based systems
+# For Alpine-based systems, you may need to use `apk` instead
+apt install -y gcc g++ make stress-ng python3
+apt install -y vim 

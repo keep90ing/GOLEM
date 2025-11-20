@@ -1,0 +1,16 @@
+[Unit]
+Description=Gocker Daemon - A custom container runtime manager
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/gocker-daemon
+WorkingDirectory=/var/lib/gocker
+Restart=always
+RestartSec=10
+User=root
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

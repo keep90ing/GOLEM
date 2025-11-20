@@ -1,0 +1,170 @@
+{
+  "id": null,
+  "uid": "gocker-obsv-host",
+  "title": "Gocker eBPF Metrics (Host Mode)",
+  "tags": ["eBPF","Gocker","Linux"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "3s",
+  "time": { "from": "now-30m", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "cgroup_id",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(cpu_sched_ns_total, cgroup_id)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "current": { "text": "All", "value": ".*" }
+      }
+    ]
+  },
+  "panels": [
+    { "type": "row", "title": "Page Faults", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 } },
+    {
+      "type": "timeseries",
+      "title": "Page Faults per Container (30s rate)",
+      "targets": [{ "expr": "rate(page_faults_total[30s])", "legendFormat": "{{cgroup_id}} ({{type}})" }],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "faults/s" } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Major / Minor Page Faults (1m rate)",
+      "targets": [
+        {
+          "expr": "sum by (cgroup_id, type) (rate(memory_page_faults_total[1m]))",
+          "legendFormat": "{{cgroup_id}} ({{type}})"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "faults/s" } }
+    },
+    { "type": "row", "title": "Scheduler", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 } },
+    {
+      "type": "timeseries",
+      "title": "Sched Switch / Wakeup per Container",
+      "targets": [
+        { "expr": "rate(sched_events_total{type=\"switch\"}[30s])", "legendFormat": "{{cgroup_id}} switch" },
+        { "expr": "rate(sched_events_total{type=\"wakeup\"}[30s])", "legendFormat": "{{cgroup_id}} wakeup" }
+      ],
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "events/s" } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Scheduler Pressure (wakeup / switch)",
+      "targets": [{ "expr": "sum by (cgroup_id) (rate(sched_events_total{job=\"pf-exporter\", type=\"wakeup\"}[2m])) / clamp_min(sum by (cgroup_id) (rate(sched_events_total{job=\"pf-exporter\", type=\"switch\"}[2m])), 1e-9)", "legendFormat": "{{cgroup_id}}" }],
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 18 },
+      "fieldConfig": { "defaults": { "unit": "ratio" } }
+    },
+    { "type": "row", "title": "CPU Usage", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 } },
+    {
+      "type": "timeseries",
+      "title": "CPU Utilization (cores)",
+      "targets": [
+        {
+          "expr": "sum by (cgroup_id) (rate(cpu_sched_ns_total{type=\"runtime\"}[1m])) / 1e9",
+          "legendFormat": "{{cgroup_id}}"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 25 },
+      "fieldConfig": { "defaults": { "unit": "cores" } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Run Queue Wait Share",
+      "targets": [
+        {
+          "expr": "sum by (cgroup_id) (rate(cpu_sched_ns_total{type=\"wait\"}[1m])) / (sum by (cgroup_id) (rate(cpu_sched_ns_total{type=\"runtime\"}[1m])) + sum by (cgroup_id) (rate(cpu_sched_ns_total{type=\"wait\"}[1m])))",
+          "legendFormat": "{{cgroup_id}}"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 25 },
+      "fieldConfig": { "defaults": { "unit": "percentunit" } }
+    },
+    {
+      "type": "timeseries",
+      "title": "I/O Wait Share",
+      "targets": [
+        {
+          "expr": "sum by (cgroup_id) (rate(cpu_sched_ns_total{type=\"iowait\"}[1m])) / (sum by (cgroup_id) (rate(cpu_sched_ns_total{type=\"runtime\"}[1m])) + sum by (cgroup_id) (rate(cpu_sched_ns_total{type=\"iowait\"}[1m])))",
+          "legendFormat": "{{cgroup_id}}"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 25 },
+      "fieldConfig": { "defaults": { "unit": "percentunit" } }
+    },
+    { "type": "row", "title": "Syscalls", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 33 } },
+    {
+      "type": "timeseries",
+      "title": "Syscall Rate (per container & syscall)",
+      "targets": [{ "expr": "sum by (cgroup_id, syscall) (rate(syscall_calls_total[30s]))", "legendFormat": "{{syscall}} {{cgroup_id}}" }],
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 34 },
+      "fieldConfig": { "defaults": { "unit": "calls/s" } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Avg Syscall Latency (ns)",
+      "targets": [
+        {
+          "expr": "(sum by (cgroup_id, syscall) (rate(syscall_latency_nanoseconds_total[30s]))) / ignoring() (sum by (cgroup_id, syscall) (rate(syscall_calls_total[30s])))",
+          "legendFormat": "{{syscall}} {{cgroup_id}}"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 42 },
+      "fieldConfig": { "defaults": { "unit": "ns" } }
+    },
+    {
+      "type": "stat",
+      "title": "Top 5 Containers by Scheduler Pressure (5m)",
+      "targets": [{ "expr": "topk(5,sum by (cgroup_id) (rate(sched_events_total{job=\"pf-exporter\", type=\"wakeup\"}[5m])) / clamp_min(sum by (cgroup_id) (rate(sched_events_total{job=\"pf-exporter\", type=\"switch\"}[5m])),1e-9))", "legendFormat": "{{cgroup_id}}" }],
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 50 },
+      "fieldConfig": { "defaults": { "unit": "ratio" } }
+    },
+    { "type": "row", "title": "PSI", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 56 } },
+    {
+      "type": "timeseries",
+      "title": "CPU PSI Stall (%)",
+      "targets": [
+        { "expr": "rate(psi_cpu_stall_seconds_total{level=\"some\"}[5m]) * 100", "legendFormat": "{{cgroup_id}} some" },
+        { "expr": "rate(psi_cpu_stall_seconds_total{level=\"full\"}[5m]) * 100", "legendFormat": "{{cgroup_id}} full" }
+      ],
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 57 },
+      "fieldConfig": { "defaults": { "unit": "percentunit" } }
+    },
+    {
+      "type": "timeseries",
+      "title": "IO PSI Stall (%)",
+      "targets": [
+        { "expr": "rate(psi_io_stall_seconds_total{level=\"some\"}[5m]) * 100", "legendFormat": "{{cgroup_id}} some" },
+        { "expr": "rate(psi_io_stall_seconds_total{level=\"full\"}[5m]) * 100", "legendFormat": "{{cgroup_id}} full" }
+      ],
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 57 },
+      "fieldConfig": { "defaults": { "unit": "percentunit" } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Memory PSI Stall (%)",
+      "targets": [
+        { "expr": "rate(psi_memory_stall_seconds_total{level=\"some\"}[5m]) * 100", "legendFormat": "{{cgroup_id}} some" },
+        { "expr": "rate(psi_memory_stall_seconds_total{level=\"full\"}[5m]) * 100", "legendFormat": "{{cgroup_id}} full" }
+      ],
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 57 },
+      "fieldConfig": { "defaults": { "unit": "percentunit" } }
+    },
+    { "type": "row", "title": "Help", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 63 } },
+    {
+      "type": "text",
+      "title": "Metrics 說明",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 64 },
+      "options": {
+        "mode": "markdown",
+        "content": "### 指標與常用查詢\n\n- `page_faults_total{type,cgroup_id}` — 缺頁事件（user|kernel）；rate(page_faults_total[30s])。\n- `memory_page_faults_total{type,cgroup_id}` — major/minor 缺頁；sum by (cgroup_id,type)(rate(memory_page_faults_total[1m]))。\n- `sched_events_total{type,cgroup_id}` — 排程事件（switch|wakeup）；壓力比值：sum by (cgroup_id)(rate(...{type=\"wakeup\"}[2m])) / clamp_min(sum by (cgroup_id)(rate(...{type=\"switch\"}[2m])), 1e-9)。\n- `cpu_sched_ns_total{type,cgroup_id}` — 累積時間（ns；runtime|wait|iowait；需 sched_schedstats=1）。\n  - CPU 利用率(cores)：sum by (cgroup_id)(rate(cpu_sched_ns_total{type=\"runtime\"}[1m])) / 1e9\n  - Run-queue Wait Share：sum by (cgroup_id)(rate(cpu_sched_ns_total{type=\"wait\"}[1m])) / sum by (cgroup_id)(rate(cpu_sched_ns_total{type=~\"runtime|wait\"}[1m]))\n  - I/O Wait Share：sum by (cgroup_id)(rate(cpu_sched_ns_total{type=\"iowait\"}[1m])) / sum by (cgroup_id)(rate(cpu_sched_ns_total{type=~\"runtime|iowait\"}[1m]))\n- `psi_*_stall_seconds_total{level,cgroup_id}` — PSI 壓力（秒）；rate(...[5m]) * 100 可得百分比。\n- `syscall_calls_total{syscall,cgroup_id}` — 系統呼叫次數；sum by (cgroup_id,syscall)(rate(syscall_calls_total[30s]))。\n- `syscall_latency_nanoseconds_total{syscall,cgroup_id}` — 系統呼叫延遲總和（ns）；平均延遲： (sum by (cgroup_id,syscall)(rate(syscall_latency_nanoseconds_total[30s]))) / ignoring() (sum by (cgroup_id,syscall)(rate(syscall_calls_total[30s])))。\n\n附註：僅統計 `/sys/fs/cgroup/gocker` 子樹；`sample_rate` 與過濾可用 /admin/config 熱更新。建議將變數 `cgroup_id` 的來源設為 `label_values(cpu_sched_ns_total, cgroup_id)`，All 值為 `.*`。"
+      }
+    }
+  ]
+}
